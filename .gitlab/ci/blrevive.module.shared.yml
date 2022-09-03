@@ -1,0 +1,80 @@
+variables:
+  msbuild: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
+  cmake: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+
+stages:
+  - fetch-version
+  - build
+  - release
+
+.release-branches: &release_branches
+  - main
+  - development
+  - /^(([0-9]+)\.)?([0-9]+)\.x/ # This matches maintenance branches
+  - /^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?$/ # This matches pre-releases
+
+.on-release: &on_release
+  only:
+    refs: *release_branches
+
+.non-release: &non_release
+  except:
+    refs: *release_branches
+
+.semantic-release: &semantic_release
+  image: node:14
+  before_script:
+    - npm install @semantic-release/gitlab @semantic-release/exec @semantic-release/changelog
+  cache:
+    paths:
+      - node_modules/
+
+fetch-semantic-version:
+  <<: *on_release
+  <<: *semantic_release
+  stage: fetch-version
+  script:
+    - npx semantic-release --generate-notes false --dry-run
+  artifacts:
+    paths:
+    - VERSION.txt
+
+generate-non-semantic-version:
+  <<: *non_release
+  stage: fetch-version
+  script:
+    - echo build-$CI_PIPELINE_ID > VERSION.txt
+  artifacts:
+    paths:
+    - VERSION.txt
+
+build_module:
+  <<: *on_release
+  stage: build
+  script:
+    - '& "$cmake" -A Win32 -B ./build'
+    - '& "$msbuild" ./build/$projectName.sln /p:Configuration=Release /p:Platform=Win32'
+  artifacts:
+    paths:
+      - build/Release
+      - VERSION.txt
+      - CHANGELOG.md
+  cache:
+    key:
+      files:
+        - CMakelists.txt
+        - cmake/packages.cmake
+  tags:
+    - shared-windows
+    - windows
+    - windows-1809
+
+release:
+  <<: *on_release
+  <<: *semantic_release
+  stage: release
+  script:
+    - npx semantic-release
+  artifacts:
+    paths:
+    - CHANGELOG.md

@@ -1,0 +1,5 @@
+variables:
+  projectName: Skeleton
+
+include:
+  - local: '.gitlab/ci/blrevive.module.shared.yml'

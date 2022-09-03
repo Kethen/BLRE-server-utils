@@ -1,0 +1,7 @@
+{
+"Name": "@PROJECT_NAME@",
+"Version": "@PROJECT_VERSION@",
+"ProxyVersion": "@PROXY_VERSION@",
+"SupportsServer": @SERVER_MODULE@,
+"SupportsClient": @CLIENT_MODULE@
+}

@@ -34,7 +34,6 @@ struct ServerProperties {
 	int NumFriendlyVotesRequiredForKick;
 	int VoteKickBanSeconds;
 	float MaxIdleTime;
-	bool bFriendlyFire;
 };
 
 struct ServerHacks {
@@ -60,9 +59,11 @@ struct ServerStatus {
 static ServerConfig serverConfig;
 static void applyConfigRuntime(AFoxGame *game, const ServerConfig &config);
 static void applyParametersToGameDefault(const ServerConfig &config);
+static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &config);
 static void backupAndSetBotnamesToGameDefault(ServerConfig &config);
 static void restoreBotnamesToGameDefault(const ServerConfig &config);
-static void applyHacks(const ServerConfig &config);
+static void applyOneshotHacks(const ServerConfig &config);
+static void applyRecurringHacks(AFoxGame *game, const ServerConfig &config);
 
 static ServerConfig serverConfigFromFile();
 
@@ -97,22 +98,34 @@ extern "C" __declspec(dllexport) void ModuleThread()
 	eventManager->RegisterHandler({
 		Events::ID("*", "IsConfigFiltered"),
 		[=](Events::Info info) {
-			applyParametersToGameDefault(serverConfig);
 			backupAndSetBotnamesToGameDefault(serverConfig);
-			applyHacks(serverConfig);
+			applyOneshotHacks(serverConfig);
 		},
 		true,
 		true});
-	logDebug("registered handler for event * IsConfigFiltered");
+	logDebug("registered oneshot handler for event * IsConfigFiltered");
 #endif
 #if 1
 	eventManager->RegisterHandler({
 		Events::ID("*", "UpdateGameSettings"),
 		[=](Events::Info info) {
+			AFoxGame *game = (AFoxGame *)info.Object;
 			restoreBotnamesToGameDefault(serverConfig);
 		},
-		false,
+		true,
 		true
+		});
+	logDebug("registered oneshot handler for event * UpdateGameSettings");
+#endif
+#if 1
+	eventManager->RegisterHandler({
+		Events::ID("*", "UpdateGameSettings"),
+		[=](Events::Info info) {
+			AFoxGame *game = (AFoxGame *)info.Object;
+			applyRecurringHacks(game, serverConfig);
+			applyParametersToGameObject(game, serverConfig);
+		},
+		true,
 		});
 	logDebug("registered handler for event * UpdateGameSettings");
 #endif
@@ -228,7 +241,6 @@ static json defaultConfigJson(){
 	defaultConfig["properties"]["NumFriendlyVotesRequiredForKick"] = 2;
 	defaultConfig["properties"]["VoteKickBanSeconds"] = 1200;
 	defaultConfig["properties"]["MaxIdleTime"] = 180.0;
-	defaultConfig["properties"]["bFriendlyFire"] = 0;
 
 	defaultConfig["hacks"]["disableOnMatchIdle"] = 1;
 	return defaultConfig;
@@ -249,7 +261,6 @@ static ServerConfig serverConfigFromJson(json input){
 		config.properties.NumFriendlyVotesRequiredForKick = input["properties"]["NumFriendlyVotesRequiredForKick"];
 		config.properties.VoteKickBanSeconds = input["properties"]["VoteKickBanSeconds"];
 		config.properties.MaxIdleTime = input["properties"]["MaxIdleTime"];
-		config.properties.bFriendlyFire = (int)input["properties"]["bFriendlyFire"];
 
 		config.hacks.disableOnMatchIdle = (int)input["hacks"]["disableOnMatchIdle"];
 	}catch(json::exception e){
@@ -287,7 +298,10 @@ static ServerConfig serverConfigFromFile(){
 }
 
 static void applyParametersToGameDefault(const ServerConfig &config){
-	AFoxGame *game = UObject::GetInstanceOf<AFoxGame>(true);
+	// place holder, haven't found parameters that can be set to default yet
+}
+
+static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &config){
 	// game->MaxIntermissionIdle = config.properties.MaxIntermissionIdle;
 	game->GameRespawnTime = config.properties.GameRespawnTime;
 	game->GameForceRespawnTime = config.properties.GameForceRespawnTime;
@@ -295,9 +309,7 @@ static void applyParametersToGameDefault(const ServerConfig &config){
 	game->NumFriendlyVotesRequiredForKick = config.properties.NumFriendlyVotesRequiredForKick;
 	game->VoteKickBanSeconds = config.properties.VoteKickBanSeconds;
 	game->MaxIdleTime = config.properties.MaxIdleTime;
-	game->bFriendlyFire = config.properties.bFriendlyFire;
 }
-
 
 static void backupAndSetBotnamesToGameDefault(ServerConfig &config){
 	AFoxGame *game = UObject::GetInstanceOf<AFoxGame>(true);
@@ -319,9 +331,13 @@ static void logOnMatchIdleHack(){
 	logDebug("OnMatchIdle disabled, lobby does not kick players after idling for 3 minutes without starting");
 }
 
-static void applyHacks(const ServerConfig &config){
+static void applyOneshotHacks(const ServerConfig &config){
 	if(config.hacks.disableOnMatchIdle){
 		// location copied from sdk
 		((UFunction*) UObject::GObjObjects()->Data[ 76108 ])->Func = (void *)logOnMatchIdleHack;
 	}
+}
+
+static void applyRecurringHacks(AFoxGame *game, const ServerConfig &config){
+	// place holder
 }

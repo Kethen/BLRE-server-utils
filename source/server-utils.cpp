@@ -34,6 +34,9 @@ struct ServerProperties {
 	int NumFriendlyVotesRequiredForKick;
 	int VoteKickBanSeconds;
 	float MaxIdleTime;
+	int MinRequiredPlayersToStart;
+	float PlayerSearchTime;
+	int TimeLimit;
 };
 
 struct ServerHacks {
@@ -99,6 +102,7 @@ extern "C" __declspec(dllexport) void ModuleThread()
 		Events::ID("*", "IsConfigFiltered"),
 		[=](Events::Info info) {
 			backupAndSetBotnamesToGameDefault(serverConfig);
+			applyParametersToGameDefault(serverConfig);
 			applyOneshotHacks(serverConfig);
 		},
 		true,
@@ -241,6 +245,9 @@ static json defaultConfigJson(){
 	defaultConfig["properties"]["NumFriendlyVotesRequiredForKick"] = 2;
 	defaultConfig["properties"]["VoteKickBanSeconds"] = 1200;
 	defaultConfig["properties"]["MaxIdleTime"] = 180.0;
+	defaultConfig["properties"]["MinRequiredPlayersToStart"] = 1;
+	defaultConfig["properties"]["PlayerSearchTime"] = 30.0;
+	defaultConfig["properties"]["TimeLimit"] = 10;
 
 	defaultConfig["hacks"]["disableOnMatchIdle"] = 1;
 	return defaultConfig;
@@ -261,6 +268,9 @@ static ServerConfig serverConfigFromJson(json input){
 		config.properties.NumFriendlyVotesRequiredForKick = input["properties"]["NumFriendlyVotesRequiredForKick"];
 		config.properties.VoteKickBanSeconds = input["properties"]["VoteKickBanSeconds"];
 		config.properties.MaxIdleTime = input["properties"]["MaxIdleTime"];
+		config.properties.MinRequiredPlayersToStart = input["properties"]["MinRequiredPlayersToStart"];
+		config.properties.PlayerSearchTime = input["properties"]["PlayerSearchTime"];
+		config.properties.TimeLimit = input["properties"]["TimeLimit"];
 
 		config.hacks.disableOnMatchIdle = (int)input["hacks"]["disableOnMatchIdle"];
 	}catch(json::exception e){
@@ -298,7 +308,8 @@ static ServerConfig serverConfigFromFile(){
 }
 
 static void applyParametersToGameDefault(const ServerConfig &config){
-	// place holder, haven't found parameters that can be set to default yet
+	UFoxIntermission *intermission = UObject::GetInstanceOf<UFoxIntermission>(true);
+	intermission->PlayerSearchTime = config.properties.PlayerSearchTime;
 }
 
 static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &config){
@@ -309,6 +320,14 @@ static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &conf
 	game->NumFriendlyVotesRequiredForKick = config.properties.NumFriendlyVotesRequiredForKick;
 	game->VoteKickBanSeconds = config.properties.VoteKickBanSeconds;
 	game->MaxIdleTime = config.properties.MaxIdleTime;
+	if (game->FGRI->GameStatus == 1){
+		UFoxIntermission *intermission = (UFoxIntermission *)game->FGRI->GameFlow;
+		intermission->MinRequiredPlayersToStart = config.properties.MinRequiredPlayersToStart;
+		game->TimeLimit = config.properties.TimeLimit;
+		game->FGRI->TimeLimit = game->TimeLimit;
+		game->FGRI->RemainingMinute = game->TimeLimit;
+		game->FGRI->RemainingTime = game->TimeLimit * 60;
+	}
 }
 
 static void backupAndSetBotnamesToGameDefault(ServerConfig &config){

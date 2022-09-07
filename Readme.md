@@ -56,6 +56,7 @@ after first run, `<blr>/FoxGame/Config/BLRevive/server_utils/server_config.json`
 | properties/MinRequiredPlayersToStart | (int) minimum player required to start a match, setting it to 1 allows starting with a single player |
 | properties/PlayerSearchTime | (int) seconds until a round start after properties/MinRequiredPlayersToStart is fulfilled, setting it too low might cause client side issues during map change |
 | properties/TimeLimit | (int) minutes a round should last, only applies when playlist is used, non playlist should use the launch parameter instead |
+| properties/GoalScore | (int) score required to win, could mean very different things in different modes, for example it means the individual score to win in DM, and number of kills in TDM |
 | hacks/disableOnMatchIdle | (int) set to non 0 to disable intermission idle kick |
 
 ## building prerequisites

@@ -37,6 +37,7 @@ struct ServerProperties {
 	int MinRequiredPlayersToStart;
 	float PlayerSearchTime;
 	int TimeLimit;
+	int GoalScore;
 };
 
 struct ServerHacks {
@@ -248,31 +249,55 @@ static json defaultConfigJson(){
 	defaultConfig["properties"]["MinRequiredPlayersToStart"] = 1;
 	defaultConfig["properties"]["PlayerSearchTime"] = 30.0;
 	defaultConfig["properties"]["TimeLimit"] = 10;
+	defaultConfig["properties"]["GoalScore"] = 3000;
 
 	defaultConfig["hacks"]["disableOnMatchIdle"] = 1;
 	return defaultConfig;
 }
 
+static json getJsonValue(json &input, json &defaultOverlay, std::string category, std::string param){
+	json val;
+	try{
+		val = input[category][param];
+		if(val.is_null()){
+			logWarn(std::format("{0}/{1} not found in config, using default value", category, param));
+			val = defaultOverlay[category][param];
+		}
+	}catch(json::exception e){
+		throw(e);
+	}
+	return val;
+}
+
 static ServerConfig serverConfigFromJson(json input){
 	ServerConfig config;
+	json defaultConfig = defaultConfigJson();
+	json val;
 	try{
 		// config.MaxIntermissionIdle = input["properties"]["MaxIntermissionIdle"];
+		json botNameArray = getJsonValue(input, defaultConfig, "properties", "RandomBotNames");
 		for(int i = 0; i < NUM_BOT_NAMES; i++){
-			config.properties.RandomBotNames[i] = input["properties"]["RandomBotNames"][i];
+			json botName = botNameArray[i];
+			if(botName.is_null()){
+				logWarn(std::format("the #{0} bot name is not provided, using default value", i));
+				botName = defaultConfig["properties"]["RandomBotNames"][i];
+			}
+			config.properties.RandomBotNames[i] = botName;
 			FString newName(config.properties.RandomBotNames[i].c_str());
 			memcpy(&(config.RandomBotNamesFString[i * sizeof(FString)]), &newName, sizeof(FString));
 		}
-		config.properties.GameRespawnTime = input["properties"]["GameRespawnTime"];
-		config.properties.GameForceRespawnTime = input["properties"]["GameForceRespawnTime"];
-		config.properties.NumEnemyVotesRequiredForKick = input["properties"]["NumEnemyVotesRequiredForKick"];
-		config.properties.NumFriendlyVotesRequiredForKick = input["properties"]["NumFriendlyVotesRequiredForKick"];
-		config.properties.VoteKickBanSeconds = input["properties"]["VoteKickBanSeconds"];
-		config.properties.MaxIdleTime = input["properties"]["MaxIdleTime"];
-		config.properties.MinRequiredPlayersToStart = input["properties"]["MinRequiredPlayersToStart"];
-		config.properties.PlayerSearchTime = input["properties"]["PlayerSearchTime"];
-		config.properties.TimeLimit = input["properties"]["TimeLimit"];
+		config.properties.GameRespawnTime = getJsonValue(input, defaultConfig, "properties", "GameRespawnTime");
+		config.properties.GameForceRespawnTime = getJsonValue(input, defaultConfig, "properties", "GameForceRespawnTime");
+		config.properties.NumEnemyVotesRequiredForKick = getJsonValue(input, defaultConfig, "properties", "NumEnemyVotesRequiredForKick");
+		config.properties.NumFriendlyVotesRequiredForKick = getJsonValue(input, defaultConfig, "properties", "NumFriendlyVotesRequiredForKick");
+		config.properties.VoteKickBanSeconds = getJsonValue(input, defaultConfig, "properties", "VoteKickBanSeconds");
+		config.properties.MaxIdleTime = getJsonValue(input, defaultConfig, "properties", "MaxIdleTime");
+		config.properties.MinRequiredPlayersToStart = getJsonValue(input, defaultConfig, "properties", "MinRequiredPlayersToStart");
+		config.properties.PlayerSearchTime = getJsonValue(input, defaultConfig, "properties", "PlayerSearchTime");
+		config.properties.TimeLimit = getJsonValue(input, defaultConfig, "properties", "TimeLimit");
+		config.properties.GoalScore = getJsonValue(input, defaultConfig, "properties", "GoalScore");
 
-		config.hacks.disableOnMatchIdle = (int)input["hacks"]["disableOnMatchIdle"];
+		config.hacks.disableOnMatchIdle = (int)getJsonValue(input, defaultConfig, "hacks", "disableOnMatchIdle");
 	}catch(json::exception e){
 		throw(e);
 	}
@@ -320,6 +345,8 @@ static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &conf
 	game->NumFriendlyVotesRequiredForKick = config.properties.NumFriendlyVotesRequiredForKick;
 	game->VoteKickBanSeconds = config.properties.VoteKickBanSeconds;
 	game->MaxIdleTime = config.properties.MaxIdleTime;
+	game->GoalScore = config.properties.GoalScore;
+	game->FGRI->GoalScore = config.properties.GoalScore;
 	if (game->FGRI->GameStatus == 1){
 		UFoxIntermission *intermission = (UFoxIntermission *)game->FGRI->GameFlow;
 		intermission->MinRequiredPlayersToStart = config.properties.MinRequiredPlayersToStart;

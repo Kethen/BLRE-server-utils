@@ -51,7 +51,7 @@ after first run, `<blr>/FoxGame/Config/BLRevive/server_utils/server_config.json`
 | properties/GameSpectatorSwitchDelayTime | (float) seconds until a player can switch back from spectator |
 | properties/NumEnemyVotesRequiredForKick | (int) number of enemy votes required to kick a player |
 | properties/NumFriendlyVotesRequiredForKick | (int) number of friendly votes required to kick a player |
-| properties/VoteKickBanSeconds | (float) seconds until a kicked player can re-join |
+| properties/VoteKickBanSeconds | (int) seconds until a kicked player can re-join |
 | properties/MaxIdleTime | (float) seconds until a player is considerd idling and kicked |
 | properties/MinRequiredPlayersToStart | (int) minimum player required to start a match, setting it to 1 allows starting with a single player |
 | properties/PlayerSearchTime | (int) seconds until a round start after properties/MinRequiredPlayersToStart is fulfilled, setting it too low might cause client side issues during map change |

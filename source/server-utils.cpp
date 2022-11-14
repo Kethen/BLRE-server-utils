@@ -68,6 +68,7 @@ static void backupAndSetBotnamesToGameDefault(ServerConfig &config);
 static void restoreBotnamesToGameDefault(const ServerConfig &config);
 static void applyOneshotHacks(const ServerConfig &config);
 static void applyRecurringHacks(AFoxGame *game, const ServerConfig &config);
+void WriteServerInfoToOutput(AFoxGame* game);
 
 static ServerConfig serverConfigFromFile();
 
@@ -129,6 +130,7 @@ extern "C" __declspec(dllexport) void ModuleThread()
 			AFoxGame *game = (AFoxGame *)info.Object;
 			applyRecurringHacks(game, serverConfig);
 			applyParametersToGameObject(game, serverConfig);
+			WriteServerInfoToOutput(game);
 		},
 		true,
 		});
@@ -355,6 +357,57 @@ static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &conf
 		game->FGRI->RemainingMinute = game->TimeLimit;
 		game->FGRI->RemainingTime = game->TimeLimit * 60;
 	}
+}
+
+void WriteServerInfoToOutput(AFoxGame* game)
+{
+	std::string mapName = game->WorldInfo->GetMapName(true).ToChar();
+	std::string serverName = game->FGRI->ServerName.ToChar();
+	std::string playlist = game->FGRI->playlistName.GetName();
+
+	TArray<APlayerReplicationInfo*> players = game->GameReplicationInfo->PRIArray;
+	json serverInfo;
+
+	int botCount = 0;
+	serverInfo["PlayerList"] = json::array();
+	for (int i = 0; i < players.Count; i++)
+	{
+		APlayerReplicationInfo* player = players(i);
+		if (player->bBot) {
+			botCount++;
+			continue;
+		}
+
+		serverInfo["PlayerList"][i - botCount] = player->PlayerName.ToChar();
+	}
+
+	serverInfo["PlayerCount"] = players.Count - botCount;
+	serverInfo["Map"] = mapName;
+	serverInfo["ServerName"] = serverName;
+	serverInfo["GameMode"] = playlist;
+
+	std::string outputPath = getOutputPath();
+	if (outputPath.length() == 0) {
+		return;
+	}
+
+	std::string path = std::format("{0}{1}", outputPath, "server_info.json");
+
+	try
+	{
+		std::ofstream output(path);
+		if (!output.is_open()) {
+			logError(std::format("failed writing server info to {0}", path));
+			return;
+		}
+		output << serverInfo.dump(4) << std::endl;
+		output.close();
+	}
+	catch (std::exception e)
+	{
+		logError(std::format("failed saving {0}", path));
+		logError(e.what());
+	};
 }
 
 static void backupAndSetBotnamesToGameDefault(ServerConfig &config){

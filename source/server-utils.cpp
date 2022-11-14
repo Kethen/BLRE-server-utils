@@ -52,15 +52,9 @@ struct ServerConfig {
 	char RandomBotNamesFStringBackup[NUM_BOT_NAMES * sizeof(FString)];
 };
 
-struct ServerStatus {
-	std::string gameType;
-	std::string mapName;
-	int numPlayers;
-	int numBots;
-	int maxPlayers;
-};
-
 static ServerConfig serverConfig;
+HANDLE serverInfoMutex;
+json serverInfo;
 static void applyConfigRuntime(AFoxGame *game, const ServerConfig &config);
 static void applyParametersToGameDefault(const ServerConfig &config);
 static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &config);
@@ -95,6 +89,8 @@ extern "C" __declspec(dllexport) void ModuleThread()
 	if (!Utils::IsServer()) {
 		return;
 	}
+
+	serverInfoMutex = CreateMutex(NULL, FALSE, NULL);
 
 	serverConfig = serverConfigFromFile();
 
@@ -359,32 +355,77 @@ static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &conf
 	}
 }
 
+static std::string unrealStringToString(FString &value){
+	if(value.Data == NULL){
+		return std::string("");
+	}
+	const char *cstr = value.ToChar();
+	std::string ret = std::string(cstr);
+	free((void *)cstr);
+	return ret;
+}
+
 void WriteServerInfoToOutput(AFoxGame* game)
 {
-	std::string mapName = game->WorldInfo->GetMapName(true).ToChar();
-	std::string serverName = game->FGRI->ServerName.ToChar();
+	// both FString manipulation and invoking game ticks tends to get crashy, but it seems to work here
+	// can't find an alternative yet however
+	FString mapNameFString = game->WorldInfo->GetMapName(true);
+	std::string mapName = unrealStringToString(mapNameFString);
+	std::string serverName = unrealStringToString(game->FGRI->ServerName);
 	std::string playlist = game->FGRI->playlistName.GetName();
 
+	TArray<AFoxTeamInfo*> teams = game->Teams;
 	TArray<APlayerReplicationInfo*> players = game->GameReplicationInfo->PRIArray;
-	json serverInfo;
 
+	WaitForSingleObject(serverInfoMutex, INFINITE);
 	int botCount = 0;
-	serverInfo["PlayerList"] = json::array();
-	for (int i = 0; i < players.Count; i++)
-	{
-		APlayerReplicationInfo* player = players(i);
-		if (player->bBot) {
-			botCount++;
-			continue;
+	int playerCount = 0;
+	serverInfo["TeamList"] = json::array();
+	// there seems to always be a dummy team
+	for (int i = 0; i < (game->NumTeams - 1) && i < (teams.Count - 1); i++){
+		AFoxTeamInfo* team = teams(i);
+		serverInfo["TeamList"][i]["PlayerList"] = json::array();
+		serverInfo["TeamList"][i]["BotList"] = json::array();
+		int teamBotCount = 0;
+		int teamPlayerCount = 0;
+		for (int j = 0; j < players.Count; j++)
+		{
+			AFoxPRI* player = (AFoxPRI *)players(j);
+			if((void *)team != (void *)player->Team){
+				continue;
+			}
+			std::string targetList;
+			int targetIndex;
+			if (player->bBot) {
+				targetIndex = teamBotCount;
+				teamBotCount++;
+				targetList = std::string("BotList");
+			}else{
+				targetIndex = teamPlayerCount;
+				teamPlayerCount++;
+				targetList = std::string("PlayerList");
+			}
+			serverInfo["TeamList"][i][targetList][targetIndex]["Name"] = unrealStringToString(player->PlayerName);
+			serverInfo["TeamList"][i][targetList][targetIndex]["Kills"] = player->TotalKills;
+			serverInfo["TeamList"][i][targetList][targetIndex]["Deaths"] = player->TotalDeaths;
+			serverInfo["TeamList"][i][targetList][targetIndex]["Score"] = player->TotalEarnedXP;
 		}
-
-		serverInfo["PlayerList"][i - botCount] = player->PlayerName.ToChar();
+		serverInfo["TeamList"][i]["PlayerCount"] = teamPlayerCount;
+		serverInfo["TeamList"][i]["BotCount"] = teamBotCount;
+		serverInfo["TeamList"][i]["TeamScore"] = (int)team->Score;
+		botCount += teamBotCount;
+		playerCount += teamPlayerCount;
 	}
 
-	serverInfo["PlayerCount"] = players.Count - botCount;
+	serverInfo["PlayerCount"] = playerCount;
+	serverInfo["BotCount"] = botCount;
 	serverInfo["Map"] = mapName;
 	serverInfo["ServerName"] = serverName;
 	serverInfo["GameMode"] = playlist;
+	serverInfo["GoalScore"] = game->GoalScore;
+	serverInfo["TimeLimit"] = game->FGRI->TimeLimit * 60;
+	serverInfo["RemainingTime"] = game->FGRI->RemainingTime;
+	serverInfo["MaxPlayers"] = game->FGRI->MaxPlayers;
 
 	std::string outputPath = getOutputPath();
 	if (outputPath.length() == 0) {
@@ -408,6 +449,7 @@ void WriteServerInfoToOutput(AFoxGame* game)
 		logError(std::format("failed saving {0}", path));
 		logError(e.what());
 	};
+	ReleaseMutex(serverInfoMutex);
 }
 
 static void backupAndSetBotnamesToGameDefault(ServerConfig &config){

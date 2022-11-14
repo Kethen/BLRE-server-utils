@@ -5,10 +5,8 @@ BLRevive module for changing server settings
 - override some server settings even the ones that could be overriden by playlist, see below for the currently supported values
 - change the bot name pool
 - disable intermission idle kick
-
-## WIP
-
-- querying server status from http
+- dumping server information into a file (thanks https://github.com/MajiKau/ !)
+- server information query from http
 
 ## runtime prerequisites
 
@@ -58,6 +56,71 @@ after first run, `<blr>/FoxGame/Config/BLRevive/server_utils/server_config.json`
 | properties/TimeLimit | (int) minutes a round should last, only applies when playlist is used, non playlist should use the launch parameter instead |
 | properties/GoalScore | (int) score required to win, could mean very different things in different modes, for example it means the individual score to win in DM, and number of kills in TDM |
 | hacks/disableOnMatchIdle | (int) set to non 0 to disable intermission idle kick |
+
+## server information query
+
+server information can be retrived from `http://<server_ip>:7778/server_info`
+
+it is also written as `<blr>/FoxGame/Config/BLRevive/server_utils/server_info.json` every 5 seconds
+
+the sample below demonstrates the current server information format
+
+```
+{
+    "BotCount": 3,
+    "GameMode": "tdm",
+    "GoalScore": 3000,
+    "Map": "seaport",
+    "MaxPlayers": 16,
+    "PlayerCount": 1,
+    "RemainingTime": 116,
+    "ServerName": "",
+    "TeamList": [
+        {
+            "BotCount": 2,
+            "BotList": [
+                {
+                    "Deaths": 2,
+                    "Kills": 1,
+                    "Name": "bot15",
+                    "Score": 200
+                },
+                {
+                    "Deaths": 3,
+                    "Kills": 1,
+                    "Name": "bot1",
+                    "Score": 100
+                }
+            ],
+            "PlayerCount": 0,
+            "PlayerList": [],
+            "TeamScore": 2
+        },
+        {
+            "BotCount": 1,
+            "BotList": [
+                {
+                    "Deaths": 1,
+                    "Kills": 1,
+                    "Name": "bot14",
+                    "Score": 150
+                }
+            ],
+            "PlayerCount": 1,
+            "PlayerList": [
+                {
+                    "Deaths": 1,
+                    "Kills": 4,
+                    "Name": "Katie",
+                    "Score": 430
+                }
+            ],
+            "TeamScore": 5
+        }
+    ],
+    "TimeLimit": 180
+}
+```
 
 ## building prerequisites
 

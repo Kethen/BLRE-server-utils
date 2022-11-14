@@ -62,7 +62,10 @@ static void backupAndSetBotnamesToGameDefault(ServerConfig &config);
 static void restoreBotnamesToGameDefault(const ServerConfig &config);
 static void applyOneshotHacks(const ServerConfig &config);
 static void applyRecurringHacks(AFoxGame *game, const ServerConfig &config);
-void WriteServerInfoToOutput(AFoxGame* game);
+static void getRequestHandler(const httplib::Request &req, httplib::Response &res);
+static void writeServerInfo();
+static void updateServerInfo(AFoxGame* game);
+static void threadLoop();
 
 static ServerConfig serverConfigFromFile();
 
@@ -126,7 +129,7 @@ extern "C" __declspec(dllexport) void ModuleThread()
 			AFoxGame *game = (AFoxGame *)info.Object;
 			applyRecurringHacks(game, serverConfig);
 			applyParametersToGameObject(game, serverConfig);
-			WriteServerInfoToOutput(game);
+			updateServerInfo(game);
 		},
 		true,
 		});
@@ -140,6 +143,11 @@ extern "C" __declspec(dllexport) void ModuleThread()
 		true});
 	logDebug("registered handler for event * *");
 #endif
+
+	while(true){
+		Sleep(5000);
+		threadLoop();
+	}
 }
 
 /// <summary>
@@ -161,6 +169,10 @@ extern "C" __declspec(dllexport) void InitializeModule(Module::InitData *data)
     // an instance of the manager can be retrieved with Events::Manager::Instance() afterwards
     Events::Manager::Link(data->EventManager);
 
+	// handle get requests
+	data->Server->AddConnectionHandler(Network::RequestType::GET, "/server_info", [&](const httplib::Request &req, httplib::Response &res)
+								 { getRequestHandler(req, res); });
+
     // initialize your module
 }
 
@@ -178,6 +190,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         break;
     }
     return TRUE;
+}
+
+static void threadLoop(){
+	writeServerInfo();
 }
 
 static std::string getConfigPath() {
@@ -365,7 +381,47 @@ static std::string unrealStringToString(FString &value){
 	return ret;
 }
 
-void WriteServerInfoToOutput(AFoxGame* game)
+static void getRequestHandler(const httplib::Request &req, httplib::Response &res){
+	WaitForSingleObject(serverInfoMutex, INFINITE);
+	std::string outputString = serverInfo.dump();
+	ReleaseMutex(serverInfoMutex);
+	// rewrite the 401 from access control, this should be available to everyone
+	// this might change in proxy, it does look like HandlerResponse::Unhandled and HandlerResponse::Handled were flipped
+	res.status = 200;
+	res.set_content(outputString, "application/json");
+}
+
+static void writeServerInfo(){
+	std::string outputPath = getOutputPath();
+	if (outputPath.length() == 0) {
+		logError("cannot write server_info.json, destination is inaccessible");
+		return;
+	}
+	std::string path = std::format("{0}{1}", outputPath, "server_info.json");
+
+	bool mutexReleased = true;
+	try
+	{
+		std::ofstream output(path);
+		if (!output.is_open()) {
+			logError(std::format("failed writing server info to {0}", path));
+			return;
+		}
+
+		WaitForSingleObject(serverInfoMutex, INFINITE);
+		std::string outputString = serverInfo.dump(4);
+		ReleaseMutex(serverInfoMutex);
+		output << outputString << std::endl;
+		output.close();
+	}
+	catch (std::exception e)
+	{
+		logError(std::format("failed saving {0}", path));
+		logError(e.what());
+	};
+}
+
+static void updateServerInfo(AFoxGame* game)
 {
 	// both FString manipulation and invoking game ticks tends to get crashy, but it seems to work here
 	// can't find an alternative yet however
@@ -427,28 +483,6 @@ void WriteServerInfoToOutput(AFoxGame* game)
 	serverInfo["RemainingTime"] = game->FGRI->RemainingTime;
 	serverInfo["MaxPlayers"] = game->FGRI->MaxPlayers;
 
-	std::string outputPath = getOutputPath();
-	if (outputPath.length() == 0) {
-		return;
-	}
-
-	std::string path = std::format("{0}{1}", outputPath, "server_info.json");
-
-	try
-	{
-		std::ofstream output(path);
-		if (!output.is_open()) {
-			logError(std::format("failed writing server info to {0}", path));
-			return;
-		}
-		output << serverInfo.dump(4) << std::endl;
-		output.close();
-	}
-	catch (std::exception e)
-	{
-		logError(std::format("failed saving {0}", path));
-		logError(e.what());
-	};
 	ReleaseMutex(serverInfoMutex);
 }
 

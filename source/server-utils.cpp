@@ -97,8 +97,6 @@ extern "C" __declspec(dllexport) void ModuleThread()
 		return;
 	}
 
-	serverInfoMutex = CreateMutex(NULL, FALSE, NULL);
-
 	serverConfig = serverConfigFromFile();
 
 	std::shared_ptr<Events::Manager> eventManager = Events::Manager::GetInstance();
@@ -173,9 +171,13 @@ extern "C" __declspec(dllexport) void InitializeModule(Module::InitData *data)
     // an instance of the manager can be retrieved with Events::Manager::Instance() afterwards
     Events::Manager::Link(data->EventManager);
 
+	serverInfoMutex = CreateMutex(NULL, FALSE, NULL);
+	serverInfoCacheMutex = CreateMutex(NULL, FALSE, NULL);
+
 	// handle get requests
 	data->Server->AddConnectionHandler(Network::RequestType::GET, "/server_info", [&](const httplib::Request &req, httplib::Response &res)
 								 { getRequestHandler(req, res); });
+
 
     // initialize your module
 }
@@ -411,7 +413,6 @@ static void writeServerInfo(){
 	}
 	std::string path = std::format("{0}{1}", outputPath, "server_info.json");
 
-	bool mutexReleased = true;
 	try
 	{
 		std::ofstream output(path);

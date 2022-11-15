@@ -55,6 +55,9 @@ struct ServerConfig {
 static ServerConfig serverConfig;
 HANDLE serverInfoMutex;
 json serverInfo;
+HANDLE serverInfoCacheMutex;
+std::string serverInfoCache;
+std::string serverInfoHTTPCache;
 static void applyConfigRuntime(AFoxGame *game, const ServerConfig &config);
 static void applyParametersToGameDefault(const ServerConfig &config);
 static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &config);
@@ -62,6 +65,7 @@ static void backupAndSetBotnamesToGameDefault(ServerConfig &config);
 static void restoreBotnamesToGameDefault(const ServerConfig &config);
 static void applyOneshotHacks(const ServerConfig &config);
 static void applyRecurringHacks(AFoxGame *game, const ServerConfig &config);
+static void cacheServerInfo();
 static void getRequestHandler(const httplib::Request &req, httplib::Response &res);
 static void writeServerInfo();
 static void updateServerInfo(AFoxGame* game);
@@ -145,7 +149,7 @@ extern "C" __declspec(dllexport) void ModuleThread()
 #endif
 
 	while(true){
-		Sleep(5000);
+		Sleep(1000);
 		threadLoop();
 	}
 }
@@ -193,6 +197,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 }
 
 static void threadLoop(){
+	cacheServerInfo();
 	writeServerInfo();
 }
 
@@ -371,20 +376,21 @@ static void applyParametersToGameObject(AFoxGame *game, const ServerConfig &conf
 	}
 }
 
-static std::string unrealStringToString(FString &value){
-	if(value.Data == NULL){
-		return std::string("");
-	}
-	const char *cstr = value.ToChar();
-	std::string ret = std::string(cstr);
-	free((void *)cstr);
-	return ret;
+static void cacheServerInfo(){
+	WaitForSingleObject(serverInfoMutex, INFINITE);
+	std::string outputString = serverInfo.dump(4);
+	std::string outputHTTPString = serverInfo.dump();
+	ReleaseMutex(serverInfoMutex);
+	WaitForSingleObject(serverInfoCacheMutex, INFINITE);
+	serverInfoCache = outputString;
+	serverInfoHTTPCache = outputHTTPString;
+	ReleaseMutex(serverInfoCacheMutex);
 }
 
 static void getRequestHandler(const httplib::Request &req, httplib::Response &res){
-	WaitForSingleObject(serverInfoMutex, INFINITE);
-	std::string outputString = serverInfo.dump();
-	ReleaseMutex(serverInfoMutex);
+	WaitForSingleObject(serverInfoCacheMutex, INFINITE);
+	std::string outputString = serverInfoHTTPCache;
+	ReleaseMutex(serverInfoCacheMutex);
 	// rewrite the 401 from access control, this should be available to everyone
 	// this might change in proxy, it does look like HandlerResponse::Unhandled and HandlerResponse::Handled were flipped
 	res.status = 200;
@@ -392,6 +398,12 @@ static void getRequestHandler(const httplib::Request &req, httplib::Response &re
 }
 
 static void writeServerInfo(){
+	static int tick = 0;
+	tick++;
+	if(tick < 5){
+		return;
+	}
+	tick = 0;
 	std::string outputPath = getOutputPath();
 	if (outputPath.length() == 0) {
 		logError("cannot write server_info.json, destination is inaccessible");
@@ -408,9 +420,9 @@ static void writeServerInfo(){
 			return;
 		}
 
-		WaitForSingleObject(serverInfoMutex, INFINITE);
-		std::string outputString = serverInfo.dump(4);
-		ReleaseMutex(serverInfoMutex);
+		WaitForSingleObject(serverInfoCacheMutex, INFINITE);
+		std::string outputString = serverInfoCache;
+		ReleaseMutex(serverInfoCacheMutex);
 		output << outputString << std::endl;
 		output.close();
 	}
@@ -419,6 +431,16 @@ static void writeServerInfo(){
 		logError(std::format("failed saving {0}", path));
 		logError(e.what());
 	};
+}
+
+static std::string unrealStringToString(FString &value){
+	if(value.Data == NULL){
+		return std::string("");
+	}
+	const char *cstr = value.ToChar();
+	std::string ret = std::string(cstr);
+	free((void *)cstr);
+	return ret;
 }
 
 static void updateServerInfo(AFoxGame* game)

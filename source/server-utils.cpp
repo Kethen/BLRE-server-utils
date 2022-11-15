@@ -447,10 +447,13 @@ static void updateServerInfo(AFoxGame* game)
 {
 	// both FString manipulation and invoking game ticks tends to get crashy, but it seems to work here
 	// can't find an alternative yet however
+	logDebug(std::format("game bears the name {0}", game->GetName()));
 	FString mapNameFString = game->WorldInfo->GetMapName(true);
 	std::string mapName = unrealStringToString(mapNameFString);
 	std::string serverName = unrealStringToString(game->FGRI->ServerName);
 	std::string playlist = game->FGRI->playlistName.GetName();
+	std::string gameType = unrealStringToString(game->GameTypeString);
+	std::string gameTypeShort = unrealStringToString(game->GameTypeAbbreviatedName);
 
 	TArray<AFoxTeamInfo*> teams = game->Teams;
 	TArray<APlayerReplicationInfo*> players = game->GameReplicationInfo->PRIArray;
@@ -499,7 +502,9 @@ static void updateServerInfo(AFoxGame* game)
 	serverInfo["BotCount"] = botCount;
 	serverInfo["Map"] = mapName;
 	serverInfo["ServerName"] = serverName;
-	serverInfo["GameMode"] = playlist;
+	serverInfo["GameMode"] = gameTypeShort;
+	serverInfo["GameModeFullName"] = gameType;
+	serverInfo["Playlist"] = playlist;
 	serverInfo["GoalScore"] = game->GoalScore;
 	serverInfo["TimeLimit"] = game->FGRI->TimeLimit * 60;
 	serverInfo["RemainingTime"] = game->FGRI->RemainingTime;

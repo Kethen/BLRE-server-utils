@@ -59,7 +59,7 @@ after first run, `<blr>/FoxGame/Config/BLRevive/server_utils/server_config.json`
 
 ## server information query
 
-server information can be retrived from `http://<server_ip>:7778/server_info`
+server information can be retrived from `http://<server_ip>:7778/server_info` (port number depends on proxy settings, it is usually +1 making it game server port +1)
 
 it is also written as `<blr>/FoxGame/Config/BLRevive/server_utils/server_info.json` every 5 seconds
 
@@ -68,54 +68,56 @@ the sample below demonstrates the current server information format
 ```
 {
     "BotCount": 3,
-    "GameMode": "tdm",
+    "GameMode": "DOM",
+    "GameModeFullName": "Domination",
     "GoalScore": 3000,
-    "Map": "seaport",
+    "Map": "deadlock",
     "MaxPlayers": 16,
     "PlayerCount": 1,
-    "RemainingTime": 116,
+    "Playlist": "DOM",
+    "RemainingTime": 143,
     "ServerName": "",
     "TeamList": [
         {
             "BotCount": 2,
             "BotList": [
                 {
-                    "Deaths": 2,
-                    "Kills": 1,
-                    "Name": "bot15",
-                    "Score": 200
+                    "Deaths": 1,
+                    "Kills": 2,
+                    "Name": "bot19",
+                    "Score": 100
                 },
                 {
-                    "Deaths": 3,
-                    "Kills": 1,
+                    "Deaths": 1,
+                    "Kills": 0,
                     "Name": "bot1",
-                    "Score": 100
+                    "Score": 25
                 }
             ],
             "PlayerCount": 0,
             "PlayerList": [],
-            "TeamScore": 2
+            "TeamScore": 0
         },
         {
             "BotCount": 1,
             "BotList": [
                 {
-                    "Deaths": 1,
-                    "Kills": 1,
-                    "Name": "bot14",
-                    "Score": 150
+                    "Deaths": 2,
+                    "Kills": 0,
+                    "Name": "bot6",
+                    "Score": 25
                 }
             ],
             "PlayerCount": 1,
             "PlayerList": [
                 {
-                    "Deaths": 1,
-                    "Kills": 4,
+                    "Deaths": 0,
+                    "Kills": 2,
                     "Name": "Katie",
-                    "Score": 430
+                    "Score": 195
                 }
             ],
-            "TeamScore": 5
+            "TeamScore": 0
         }
     ],
     "TimeLimit": 180

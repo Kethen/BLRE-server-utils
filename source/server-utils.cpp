@@ -447,7 +447,6 @@ static void updateServerInfo(AFoxGame* game)
 {
 	// both FString manipulation and invoking game ticks tends to get crashy, but it seems to work here
 	// can't find an alternative yet however
-	logDebug(std::format("game bears the name {0}", game->GetName()));
 	FString mapNameFString = game->WorldInfo->GetMapName(true);
 	std::string mapName = unrealStringToString(mapNameFString);
 	std::string serverName = unrealStringToString(game->FGRI->ServerName);
